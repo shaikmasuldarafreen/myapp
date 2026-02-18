@@ -222,6 +222,52 @@ $reset_url = BASE_URL . 'reset-password.php?token=' . $token;
 // Use PHPMailer or similar to send email with Reset URL to user
 ```
 
+### Sending email on XAMPP (development)
+
+By default on Windows/XAMPP, PHP's `mail()` may not be configured. Two approaches:
+
+- Quick dev option (uses PHP `mail()` with sendmail):
+  1. Locate `sendmail` in your XAMPP installation (e.g. `C:\xampp\sendmail`).
+  2. Edit `sendmail\sendmail.ini` with your SMTP provider settings (SMTP server, port, username, password).
+  3. Edit `php.ini` (used by Apache) and set the `sendmail_path` or the SMTP settings to point to sendmail. Restart Apache.
+  4. With `sendmail` configured, the `mail()` call in `src/Auth.php` will attempt to send the reset link.
+
+- Recommended: Use PHPMailer with SMTP (reliable and easy to configure)
+  1. Install Composer if you don't have it: https://getcomposer.org/download/
+  2. From project root run:
+     ```bash
+     composer require phpmailer/phpmailer
+     ```
+  3. Update `src/Auth.php` to send via SMTP using PHPMailer. Example:
+     ```php
+     use PHPMailer\PHPMailer\PHPMailer;
+     use PHPMailer\PHPMailer\Exception;
+
+     $mail = new PHPMailer(true);
+     try {
+         $mail->isSMTP();
+         $mail->Host = 'smtp.example.com';
+         $mail->SMTPAuth = true;
+         $mail->Username = 'smtp_user@example.com';
+         $mail->Password = 'smtp_password';
+         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+         $mail->Port = 587;
+
+         $mail->setFrom('no-reply@example.com', 'Your App');
+         $mail->addAddress($email);
+         $mail->isHTML(false);
+         $mail->Subject = 'Password reset request';
+         $mail->Body = "Click to reset: " . $reset_url;
+         $mail->send();
+     } catch (Exception $e) {
+         error_log('PHPMailer error: ' . $mail->ErrorInfo);
+     }
+     ```
+
+  4. PHPMailer handles SMTP authentication and TLS, so you can use Gmail, SendGrid, Mailgun, or your own SMTP server.
+
+Security note: never commit SMTP credentials to the repository. Store them in environment variables or a protected config file outside version control.
+
 ## 🐛 Troubleshooting
 
 ### "Connection error" on login page

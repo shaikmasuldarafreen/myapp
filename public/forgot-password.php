@@ -3,11 +3,14 @@ require_once '../src/config.php';
 require_once '../src/Database.php';
 require_once '../src/Auth.php';
 
-$db = new Database();
-$auth = new Auth($db);
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 
 $message = '';
 $errors = [];
+
+$db = new Database();
+$auth = new Auth($db);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
@@ -16,13 +19,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($result['success']) {
         $message = $result['message'];
-        // In a real app, you would send an email here
-        // For testing, display the token
+
+        // If token is returned (mail failed in dev mode), show it
         if (isset($result['token'])) {
-            $_SESSION['reset_token'] = $result['token'];
+            $token = $result['token'];
+            $resetLink = "http://localhost/php-learning-project/public/reset-password.php?token=" . urlencode($token);
+            $message .= " <a href=\"$resetLink\">Click here to reset (dev mode)</a>";
         }
     } else {
-        $errors = $result['errors'];
+        $errors = $result['errors'] ?? [$result['message'] ?? 'Unknown error'];
     }
 }
 ?>
@@ -133,21 +138,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin-bottom: 20px;
             border-radius: 5px;
         }
-        .token-box {
-            background: #eef;
-            border: 1px solid #ccf;
-            padding: 12px;
-            margin-top: 20px;
-            border-radius: 5px;
-            font-size: 12px;
-            word-break: break-all;
-            color: #333;
-        }
-        .token-label {
-            color: #666;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
     </style>
 </head>
 <body>
@@ -155,22 +145,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <h1>Forgot Password</h1>
         <p class="subtitle">Enter your email to receive a password reset link</p>
 
-        <?php if (empty($errors) && !empty($message)): ?>
+        <?php if (!empty($message)): ?>
             <div class="success-box">
-                <?php echo htmlspecialchars($message); ?>
+                <?php echo $message; ?>
             </div>
-
-            <?php if (isset($_SESSION['reset_token'])): ?>
-                <div class="token-box">
-                    <div class="token-label">For testing, your reset token is:</div>
-                    <?php echo htmlspecialchars($_SESSION['reset_token']); ?>
-                    <p style="margin-top: 10px; font-size: 11px;">
-                        <a href="reset-password.php?token=<?php echo urlencode($_SESSION['reset_token']); ?>" style="color: #667eea; text-decoration: underline;">
-                            Click here to reset password
-                        </a>
-                    </p>
-                </div>
-            <?php endif; ?>
         <?php endif; ?>
 
         <?php if (!empty($errors)): ?>
@@ -181,22 +159,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         <?php endif; ?>
 
-        <?php if (empty($message) || !empty($errors)): ?>
-            <form method="POST" action="forgot-password.php">
-                <div class="form-group">
-                    <label for="email">Email:</label>
-                    <input 
-                        type="email" 
-                        id="email" 
-                        name="email" 
-                        required
-                        value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>"
-                    >
-                </div>
+        <form method="POST" action="forgot-password.php">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    required
+                    value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>"
+                >
+            </div>
 
-                <button type="submit" class="btn">Send Reset Link</button>
-            </form>
-        <?php endif; ?>
+            <button type="submit" class="btn">Send Reset Link</button>
+        </form>
 
         <div class="links">
             <a href="login.php">Back to login</a>

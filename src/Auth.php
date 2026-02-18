@@ -1,5 +1,10 @@
 <?php
 
+// Only include PHPMailer if it's available (installed via Composer)
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+}
+
 class Auth {
     private $db;
 
@@ -154,13 +159,57 @@ class Auth {
             'expires_at' => $expires
         ]);
 
-        // In production, send email with reset link
-        // For now, return token for testing
-        return [
+        // Build reset URL
+        $reset_url = defined('BASE_URL') ? rtrim(BASE_URL, '/') . '/reset-password.php?token=' . urlencode($token) : ('reset-password.php?token=' . urlencode($token));
+
+        // Try to send email via PHPMailer SMTP
+        $response = [
             'success' => true,
-            'message' => 'If email exists, reset link will be sent',
-            'token' => $token // Remove in production after implementing email
+            'message' => 'If email exists, reset link will be sent'
         ];
+
+        $mail_sent = false;
+        try {
+            // Check if SMTP constants are defined and PHPMailer is available
+            if (defined('SMTP_HOST') && defined('SMTP_USER') && defined('SMTP_PASS') && class_exists('PHPMailer\PHPMailer\PHPMailer')) {
+                $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+                $mail->isSMTP();
+                $mail->Host       = SMTP_HOST;
+                $mail->SMTPAuth   = true;
+                $mail->Username   = SMTP_USER;
+                $mail->Password   = SMTP_PASS;
+                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+                $mail->Port       = defined('SMTP_PORT') ? SMTP_PORT : 587;
+
+                $mail->setFrom(defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : 'no-reply@localhost', defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'App');
+                $mail->addAddress($email);
+                $mail->isHTML(false);
+
+                $mail->Subject = 'Password reset request';
+                $mail->Body = "Hello,\n\nClick the link below to reset your password:\n\n{$reset_url}\n\nIf you didn't request this, you can ignore this message.\n\nThanks.";
+
+                $mail->send();
+                $mail_sent = true;
+            } else {
+                // SMTP not configured or PHPMailer not installed, use PHP mail() as fallback
+                $subject = 'Password reset request';
+                $message = "Hello,\n\nClick the link below to reset your password:\n\n{$reset_url}\n\nIf you didn't request this, you can ignore this message.\n\nThanks.";
+                $headers = "From: no-reply@" . ($_SERVER['SERVER_NAME'] ?? 'localhost') . "\r\n";
+                $headers .= "Reply-To: no-reply@" . ($_SERVER['SERVER_NAME'] ?? 'localhost') . "\r\n";
+                $mail_sent = @mail($email, $subject, $message, $headers);
+            }
+        } catch (Exception $e) {
+            error_log('Email send error: ' . $e->getMessage());
+            $mail_sent = false;
+        }
+
+        if (!$mail_sent) {
+            // Mail failed — include token for development testing (remove in production)
+            $response['token'] = $token;
+            error_log('Password reset email not sent to: ' . $email . ' — token: ' . $token);
+        }
+
+        return $response;
     }
 
     /**
