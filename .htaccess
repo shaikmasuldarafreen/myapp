@@ -1,0 +1,15 @@
+# The .htaccess file is used for URL rewriting and other server configurations.
+
+RewriteEngine On
+RewriteBase /php-learning-project/public/
+
+# Redirect to index.php for all requests
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Prevent access to sensitive files
+<FilesMatch "\.(ini|log|env|sql)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>

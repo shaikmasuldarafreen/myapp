@@ -1,0 +1,15 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /php-learning-project/public/
+
+    # Redirect to index.php for all requests that aren't actual files or folders
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Prevent access to sensitive files
+<FilesMatch "\.(ini|log|env|sql)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
